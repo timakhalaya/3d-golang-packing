@@ -2,200 +2,142 @@ package main
 
 import (
 	"fmt"
-	"strings"
 )
 
 type Item struct {
-	Width  int
-	Height int
-	Depth  int
+	Width, Depth, Height int
 }
 
-type Coordinate struct {
-	X, Y, Z                          int
-	itemWidth, itemHeight, itemDepth int
+type Palette struct {
+	Width, Depth, Height int
+}
+
+type PlacedItem struct {
+	X, Y, Z              int
+	Width, Depth, Height int
 }
 
 type Layer struct {
-	Items []*Coordinate
-}
-
-func generateSVG(layers []Layer, itemWidth, itemHeight, paletteWidth, paletteHeight int) string {
-	var svg strings.Builder
-
-	// Start SVG element
-	svg.WriteString("<svg xmlns=\"http://www.w3.org/2000/svg\" ")
-	svg.WriteString(fmt.Sprintf("width=\"%d\" height=\"%d\">\n", paletteWidth*itemWidth, paletteHeight*itemHeight))
-
-	// Draw palette rectangle
-	svg.WriteString(fmt.Sprintf("<rect x=\"0\" y=\"0\" width=\"%d\" height=\"%d\" fill=\"none\" stroke=\"black\"/>\n", paletteWidth*itemWidth, paletteHeight*itemHeight))
-
-	// Draw items
-	for _, layer := range layers {
-		for _, item := range layer.Items {
-			// Draw item border
-			svg.WriteString(fmt.Sprintf("<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"none\" stroke=\"black\"/>\n", item.X*itemWidth, item.Y*itemHeight, itemWidth, itemHeight))
-			// Draw filled item
-			svg.WriteString(fmt.Sprintf("<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"blue\"/>\n", item.X*itemWidth, item.Y*itemHeight, itemWidth, itemHeight))
-		}
-	}
-
-	// End SVG element
-	svg.WriteString("</svg>")
-
-	return svg.String()
-}
-
-func placeItemsOnPalette(paletteWidth, paletteHeight, paletteDepth int, item Item) ([]Layer, int, float64) {
-	var layers []Layer
-	var totalItems int
-	totalVolume := paletteWidth * paletteHeight * paletteDepth
-	hasBeenRotated := false
-
-	/**
-	Check if one of the item sides is close to pallete size in proximity of 15%
-	*/
-	RotationIn3d(&item, paletteWidth, paletteHeight, paletteDepth)
-
-	//the depth should be added based on item depth
-	for z := 0; z < paletteDepth; z += item.Depth {
-		remainingHeight := paletteHeight
-		var layerItems []*Coordinate
-
-		// y is free until we iterate over all items height
-		for y := 0; y < paletteHeight; y += item.Height {
-			if remainingHeight < item.Height {
-				RotateItem(&item)
-				hasBeenRotated = true
-				if remainingHeight < item.Height {
-					break
-				}
-			}
-			remainingHeight -= item.Height
-
-			remainingWidth := paletteWidth
-			for x := 0; x < paletteWidth; x += item.Width {
-				// test also if height is left check volume of space left and try to fit
-				if (remainingWidth < item.Width) && remainingHeight == 0 {
-					break
-				} else if (remainingWidth < item.Width) && remainingHeight > 0 {
-					if !hasBeenRotated {
-						RotateItem(&item)
-						hasBeenRotated = true
-					}
-					if remainingHeight*item.Width < item.Width*item.Height {
-						break
-					}
-				}
-				remainingWidth -= item.Width
-
-				if x+item.Width <= paletteWidth && y+item.Height <= paletteHeight && z+item.Depth <= paletteDepth {
-					layerItems = append(layerItems, &Coordinate{X: x, Y: y, Z: z, itemDepth: item.Depth, itemWidth: item.Width, itemHeight: item.Height})
-					totalItems++
-				}
-			}
-			if hasBeenRotated {
-				RotateItem(&item)
-				hasBeenRotated = false
-			}
-		}
-		if hasBeenRotated {
-			RotateItem(&item)
-			hasBeenRotated = false
-		}
-		/**
-		Layer might not be efficient then we need to recalculate
-		*/
-		if len(layerItems) > 0 {
-			itemOneVolume := item.Width * item.Height
-			itemAllVolume := len(layerItems) * itemOneVolume
-			paletteVolume := paletteWidth * paletteHeight
-			if paletteVolume-itemAllVolume > itemOneVolume {
-				rearrangeLayer(layerItems, &item, paletteWidth, paletteHeight)
-			}
-		}
-		layers = append(layers, Layer{Items: layerItems})
-		//after layer has been added we need to rotate item to it's previous state
-	}
-
-	volumeUsage := float64(totalItems*item.Width*item.Height*item.Depth) / float64(totalVolume) * 100.0
-	return layers, totalItems, volumeUsage
-}
-
-func rearrangeLayer(coordinates []*Coordinate, item *Item, paletteWidth int, paletteHeight int) {
-	fmt.Println("There should be still available place left!!!")
-	//rotate most right and try to fit --- find most right item
-	initialWidth := paletteWidth
-	// aggregate all width before last element
-	allWidthWithLast := 0
-	allHeightWithLast := 0
-	for i, coordinate := range coordinates {
-		allWidthWithLast += coordinate.itemWidth
-		allHeightWithLast += coordinate.itemHeight
-		initialWidth = initialWidth - coordinate.itemWidth
-		if initialWidth <= 0 {
-			// last item in the row
-			lastInLayerRow := coordinates[i-1]
-			nextInLayerRow := coordinate
-			// remove last width from all and add height if rotated
-			swappedXYSummWidth := allWidthWithLast - lastInLayerRow.itemWidth + lastInLayerRow.itemHeight
-			swappedXYSummHeight := allHeightWithLast - lastInLayerRow.itemHeight + lastInLayerRow.itemWidth
-			if swappedXYSummWidth <= paletteWidth && swappedXYSummHeight <= paletteHeight {
-				// check that there is no overlap with item below
-				fmt.Println(nextInLayerRow)
-			}
-
-		}
-	}
-}
-
-// RotateItem rotates the item dimensions to maximize space utilization within the layer
-func RotateItem(item *Item) {
-	// Swap width and height
-	item.Width, item.Height = item.Height, item.Width
+	Items  []PlacedItem
+	Height int
 }
 
 func main() {
-	paletteWidth := 120
-	paletteHeight := 80
-	paletteDepth := 180
-	/**
-	Check rotation
-	*/
-	item := Item{Width: 120, Height: 80, Depth: 155}
+	palette := Palette{Width: 1000, Depth: 1000, Height: 1000}
+	item := Item{Width: 200, Depth: 391, Height: 200}
 
-	result, totalItems, volumeUsage := placeItemsOnPalette(paletteWidth, paletteHeight, paletteDepth, item)
+	layers, itemsPlaced, volumeUtilized := placeItems(palette, item)
+	fmt.Printf("Number of layers: %d\n", len(layers))
+	fmt.Printf("Number of items placed: %d\n", itemsPlaced)
+	fmt.Printf("Volume utilized: %.2f%%\n", volumeUtilized)
 
-	//svg := generateSVG(result, item.Width, item.Height, paletteWidth, paletteHeight)
-	//fmt.Println(svg)
+	for i, layer := range layers {
+		fmt.Printf("Layer %d (Height %d):\n", i+1, layer.Height)
+		for _, placedItem := range layer.Items {
+			fmt.Printf("  Item placed at (%d, %d, %d) of size (%d, %d, %d)\n", placedItem.X, placedItem.Y, placedItem.Z, placedItem.Width, placedItem.Depth, placedItem.Height)
+		}
+	}
+}
 
-	for i, layer := range result {
-		fmt.Printf("Layer %d:\n", i+1)
-		for _, coordinate := range layer.Items {
-			fmt.Printf("Item at coordinate (%d, %d, %d) placed with dimensions of (width: %d , height: %d, depth: %d) \n", coordinate.X, coordinate.Y, coordinate.Z, coordinate.itemWidth, coordinate.itemHeight, coordinate.itemDepth)
+func placeItems(palette Palette, item Item) ([]Layer, int, float64) {
+	var layers []Layer
+	remainingHeight := palette.Height
+	itemsPlaced := 0
+	totalVolume := 0
+	paletteVolume := palette.Width * palette.Depth * palette.Height
+
+	for remainingHeight > 0 {
+		layer, layerHeight := placeLayer(palette, item, remainingHeight)
+		if layerHeight == 0 {
+			break
+		}
+		layers = append(layers, layer)
+		remainingHeight -= layerHeight
+		itemsPlaced += len(layer.Items)
+		totalVolume += layerHeight * palette.Width * palette.Depth
+	}
+
+	volumeUtilized := (float64(totalVolume) / float64(paletteVolume)) * 100
+	return layers, itemsPlaced, volumeUtilized
+}
+
+func placeLayer(palette Palette, item Item, remainingHeight int) (Layer, int) {
+	layer := Layer{}
+	layerHeight := 0
+	space := make([][]bool, palette.Width)
+	for i := range space {
+		space[i] = make([]bool, palette.Depth)
+	}
+
+	for x := 0; x < palette.Width; x++ {
+		for y := 0; y < palette.Depth; y++ {
+			if !space[x][y] {
+				rotatedItem := item.rotateAndPlace(palette, x, y, space, remainingHeight)
+				if rotatedItem.Height > 0 {
+					layerHeight = max(layerHeight, rotatedItem.Height)
+					layer.Items = append(layer.Items, rotatedItem)
+				}
+			}
 		}
 	}
 
-	fmt.Printf("Total Items Placed: %d\n", totalItems)
-	fmt.Printf("Volume Usage: %.2f%%\n", volumeUsage)
+	layer.Height = layerHeight
+	return layer, layerHeight
 }
 
-func RotationIn3d(item *Item, palWidth int, palHeight int, palDepth int) {
-	/*
-		Большую сторону надо двигать к наиболее большой стороне паллеты
-	*/
-	// need to rotate item height and depth
-	if item.Height > palHeight && item.Height <= palDepth && palHeight >= item.Depth {
-		itemDepth := item.Depth
-		item.Depth = item.Height
-		item.Height = itemDepth
+func (item Item) rotateAndPlace(palette Palette, x, y int, space [][]bool, remainingHeight int) PlacedItem {
+	for rotation := 0; rotation < 6; rotation++ {
+		rotatedItem := item.rotate(rotation)
+		if rotatedItem.Height <= remainingHeight && canPlace(space, x, y, rotatedItem) {
+			place(space, x, y, rotatedItem)
+			return PlacedItem{X: x, Y: y, Z: palette.Height - remainingHeight, Width: rotatedItem.Width, Depth: rotatedItem.Depth, Height: rotatedItem.Height}
+		}
 	}
+	return PlacedItem{}
+}
 
-	// need to rotate item height and width
-	if item.Height > palHeight && item.Height <= palWidth && palHeight >= item.Width {
-		itemHeight := item.Height
-		item.Height = item.Width
-		item.Width = itemHeight
+func (item Item) rotate(rotation int) Item {
+	switch rotation {
+	case 1:
+		return Item{Width: item.Depth, Depth: item.Height, Height: item.Width}
+	case 2:
+		return Item{Width: item.Height, Depth: item.Width, Height: item.Depth}
+	case 3:
+		return Item{Width: item.Width, Depth: item.Height, Height: item.Depth}
+	case 4:
+		return Item{Width: item.Height, Depth: item.Depth, Height: item.Width}
+	case 5:
+		return Item{Width: item.Depth, Depth: item.Width, Height: item.Height}
+	default:
+		return item
 	}
-	fmt.Println(item)
+}
+
+func canPlace(space [][]bool, x, y int, item Item) bool {
+	if x+item.Width > len(space) || y+item.Depth > len(space[0]) {
+		return false
+	}
+	for i := x; i < x+item.Width; i++ {
+		for j := y; j < y+item.Depth; j++ {
+			if space[i][j] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func place(space [][]bool, x, y int, item Item) {
+	for i := x; i < x+item.Width; i++ {
+		for j := y; j < y+item.Depth; j++ {
+			space[i][j] = true
+		}
+	}
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
