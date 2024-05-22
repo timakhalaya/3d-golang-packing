@@ -162,7 +162,7 @@ func main() {
 	/**
 	Check rotation
 	*/
-	item := Item{Width: 120, Height: 80, Depth: 155}
+	item := Item{Width: 38, Height: 68, Depth: 35}
 
 	result, totalItems, volumeUsage := placeItemsOnPalette(paletteWidth, paletteHeight, paletteDepth, item)
 
@@ -170,9 +170,11 @@ func main() {
 	//fmt.Println(svg)
 
 	for i, layer := range result {
-		fmt.Printf("Layer %d:\n", i+1)
-		for _, coordinate := range layer.Items {
-			fmt.Printf("Item at coordinate (%d, %d, %d) placed with dimensions of (width: %d , height: %d, depth: %d) \n", coordinate.X, coordinate.Y, coordinate.Z, coordinate.itemWidth, coordinate.itemHeight, coordinate.itemDepth)
+		if len(layer.Items) > 0 {
+			fmt.Printf("Layer %d:\n", i+1)
+			for _, coordinate := range layer.Items {
+				fmt.Printf("Item at coordinate (%d, %d, %d) placed with dimensions of (width: %d , height: %d, depth: %d) \n", coordinate.X, coordinate.Y, coordinate.Z, coordinate.itemWidth, coordinate.itemHeight, coordinate.itemDepth)
+			}
 		}
 	}
 
