@@ -174,9 +174,9 @@ func main() {
 			Original + 5 possible rotations
 			*/
 			item := Item{
-				Width:  600,
-				Height: 400,
-				Depth:  100,
+				Width:  550,
+				Height: 310,
+				Depth:  550,
 			}
 			/**
 			we need syncronization on this level as well
@@ -187,11 +187,9 @@ func main() {
 				childWg.Add(1)
 				i := i
 				go func() {
-					if i > 0 {
-						item.Rotate(i)
-					}
+					roatatedItem := item.Rotate(i)
 					defer childWg.Done()
-					placeItemsOnPalette(palette, &item, resultChan)
+					placeItemsOnPalette(palette, roatatedItem, resultChan)
 				}()
 			}
 			childWg.Wait()

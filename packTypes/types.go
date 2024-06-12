@@ -91,7 +91,7 @@ func GetPalettePlans() PaletteMap {
 	initMap["EuroPalette"] = Palette{
 		Width:  1200,
 		Height: 800,
-		Depth:  800,
+		Depth:  1800,
 	}
 
 	initMap["IndustrialPalette"] = Palette{
